@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>¡La Aventura de Sofía por España!</title>
+
+    <!-- Tailwind CSS para el diseño -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Leaflet CSS para el mapa -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&family=Caveat:wght@600&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Nunito', sans-serif; background-color: #f0fdfa; }
+        .font-diario { font-family: 'Caveat', cursive; } /* Fuente de escritura a mano para las pistas */
+
+        #map { background-color: #bae6fd; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .leaflet-interactive { transition: fill 0.2s ease, fill-opacity 0.2s ease; }
+
+        /* Animaciones divertidas */
+        @keyframes bounce-short {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+        .animate-bounce-short { animation: bounce-short 0.5s ease-in-out; }
+
+        /* Ocultar barra de scroll en panel de opciones */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col overflow-hidden text-slate-800">
+
+    <!-- Encabezado -->
+    <header class="bg-teal-600 text-white p-4 shadow-md z-10 flex flex-col sm:flex-row justify-between items-center gap-2">
+        <h1 class="text-2xl sm:text-3xl font-black flex items-center gap-2">
+            🎒 ¡La expedición de Sofía! 🇲🇽 ✈️ 🇪🇸
+        </h1>
+        <div class="flex bg-teal-800 rounded-full px-4 py-1 font-bold text-lg items-center gap-2 shadow-inner">
+            <span>Millas de viajera:</span>
+            <span id="score" class="text-yellow-300 text-2xl">0</span>
+        </div>
+    </header>
+
+    <!-- Contenedor Principal -->
+    <main class="flex-1 flex flex-col md:flex-row p-4 gap-4 overflow-hidden">
+
+        <!-- Panel Izquierdo: Controles e Info -->
+        <aside class="w-full md:w-1/3 lg:w-1/4 flex flex-col gap-4 overflow-y-auto no-scrollbar">
+
+            <!-- Selector de Modos -->
+            <div class="bg-white p-4 rounded-2xl shadow-md border-t-4 border-teal-500 flex-shrink-0">
+                <h2 class="text-xl font-bold mb-3 text-teal-700">Diario de viaje:</h2>
+                <div class="flex flex-col gap-2">
+                    <button onclick="setMode('explore')" id="btn-explore" class="mode-btn bg-teal-100 hover:bg-teal-200 text-teal-800 font-bold py-2 px-4 rounded-xl transition-colors border-2 border-transparent text-left flex items-center gap-2">
+                        🧭 Sofía explora libremente
+                    </button>
+                    <button onclick="setMode('guess_prov')" id="btn-guess_prov" class="mode-btn bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold py-2 px-4 rounded-xl transition-colors border-2 border-transparent text-left flex items-center gap-2">
+                        🗺️ Sofía busca la provincia
+                    </button>
+                    <button onclick="setMode('guess_com')" id="btn-guess_com" class="mode-btn bg-purple-100 hover:bg-purple-200 text-purple-800 font-bold py-2 px-4 rounded-xl transition-colors border-2 border-transparent text-left flex items-center gap-2">
+                        🧩 El gran reto de las Comunidades
+                    </button>
+                </div>
+            </div>
+
+            <!-- Panel de Juego Activo -->
+            <div id="game-panel" class="bg-white p-5 rounded-2xl shadow-md border-t-4 border-yellow-400 flex-1 flex flex-col justify-center min-h-[250px] overflow-y-auto">
+                <div id="loading" class="text-center text-gray-500 font-bold animate-pulse">
+                    Preparando la mochila y la brújula para Sofía... 🗺️🧭
+                </div>
+
+                <div id="game-content" class="hidden flex-col items-center text-center h-full">
+                    <h3 id="game-prompt-title" class="text-sm uppercase tracking-wide text-gray-500 font-bold mb-1"></h3>
+                    <p id="game-prompt" class="text-2xl font-black text-slate-700 mb-2"></p>
+
+                    <!-- Botón y texto de pista para el modo "Buscar Provincia" -->
+                    <button id="btn-pista" onclick="mostrarPista()" class="mb-4 text-sm bg-yellow-100 hover:bg-yellow-200 text-yellow-800 py-2 px-4 rounded-xl font-bold transition-all shadow-sm border border-yellow-300 flex items-center gap-2 hidden">
+                        💡 Leer pista en el diario
+                    </button>
+                    <div id="pista-activa" class="hidden w-full mb-4 bg-yellow-50 border border-yellow-200 p-3 rounded-xl shadow-inner text-left">
+                        <span class="text-xs uppercase font-bold text-yellow-600 block mb-1">Diario de Sofía:</span>
+                        <p id="pista-texto" class="font-diario text-xl text-slate-700 leading-tight"></p>
+                    </div>
+
+                    <!-- Botones de opciones múltiples para adivinar comunidad -->
+                    <div id="multiple-choice" class="w-full flex flex-col gap-2 hidden mt-2">
+                        <!-- Botones insertados por JS -->
+                    </div>
+
+                    <!-- Mensaje de Feedback -->
+                    <div id="feedback" class="mt-auto font-bold text-lg p-3 rounded-xl w-full hidden transition-all"></div>
+                </div>
+            </div>
+
+        </aside>
+
+        <!-- Panel Derecho: Mapa -->
+        <div class="w-full md:w-2/3 lg:w-3/4 h-[50vh] md:h-full relative">
+            <div id="map" class="w-full h-full border-4 border-white rounded-xl"></div>
+
+            <!-- Overlay informativo para el modo exploración -->
+            <div id="explore-info" class="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm p-4 rounded-xl shadow-lg border-2 border-teal-200 pointer-events-none hidden z-[1000] w-72 md:w-80">
+                <p class="text-xs text-gray-500 font-bold uppercase">Provincia descubierta</p>
+                <p id="info-prov" class="text-2xl font-black text-slate-800 leading-tight"></p>
+                <p id="info-com" class="text-sm font-bold text-teal-600 leading-tight mb-2"></p>
+
+                <!-- Truco de memoria -->
+                <div class="bg-yellow-100 border border-yellow-300 p-3 rounded-lg shadow-inner mt-2">
+                    <p class="text-xs text-yellow-700 font-bold uppercase mb-1">💡 Truco para recordar:</p>
+                    <p id="info-pista" class="font-diario text-xl text-slate-700 leading-tight"></p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <script>
+        // --- BASE DE DATOS PROVINCIAS -> COMUNIDAD AUTÓNOMA ---
+        const mapProvinciaComunidad = {
+            "alava": "País Vasco", "álava": "País Vasco", "araba/álava": "País Vasco",
+            "albacete": "Castilla-La Mancha",
+            "alicante": "Comunitat Valenciana", "alacant": "Comunitat Valenciana",
+            "almeria": "Andalucía", "almería": "Andalucía",
+            "asturias": "Asturias",
+            "avila": "Castilla y León", "ávila": "Castilla y León",
+            "badajoz": "Extremadura",
+            "baleares": "Illes Balears", "illes balears": "Illes Balears",
+            "barcelona": "Cataluña", "catalunya": "Cataluña",
+            "burgos": "Castilla y León",
+            "caceres": "Extremadura", "cáceres": "Extremadura",
+            "cadiz": "Andalucía", "cádiz": "Andalucía",
+            "cantabria": "Cantabria",
+            "castellon": "Comunitat Valenciana", "castellón": "Comunitat Valenciana",
+            "ciudad real": "Castilla-La Mancha",
+            "cordoba": "Andalucía", "córdoba": "Andalucía",
+            "cuenca": "Castilla-La Mancha",
+            "girona": "Cataluña", "gerona": "Cataluña",
+            "granada": "Andalucía",
+            "guadalajara": "Castilla-La Mancha",
+            "gipuzkoa": "País Vasco", "guipúzcoa": "País Vasco",
+            "huelva": "Andalucía",
+            "huesca": "Aragón",
+            "jaen": "Andalucía", "jaén": "Andalucía",
+            "la coruna": "Galicia", "a coruña": "Galicia", "la coruña": "Galicia",
+            "la rioja": "La Rioja",
+            "las palmas": "Canarias",
+            "leon": "Castilla y León", "león": "Castilla y León",
+            "lleida": "Cataluña", "lérida": "Cataluña",
+            "lugo": "Galicia",
+            "madrid": "Comunidad de Madrid",
+            "malaga": "Andalucía", "málaga": "Andalucía",
+            "murcia": "Región de Murcia",
+            "navarra": "Navarra", "nafarroa": "Navarra",
+            "ourense": "Galicia", "orense": "Galicia",
+            "palencia": "Castilla y León",
+            "pontevedra": "Galicia",
+            "salamanca": "Castilla y León",
+            "santa cruz de tenerife": "Canarias",
+            "segovia": "Castilla y León",
+            "sevilla": "Andalucía",
+            "soria": "Castilla y León",
+            "tarragona": "Cataluña",
+            "teruel": "Aragón",
+            "toledo": "Castilla-La Mancha",
+            "valencia": "Comunitat Valenciana", "valència": "Comunitat Valenciana",
+            "valladolid": "Castilla y León",
+            "bizkaia": "País Vasco", "vizcaya": "País Vasco",
+            "zamora": "Castilla y León",
+            "zaragoza": "Aragón",
+            "ceuta": "Ceuta",
+            "melilla": "Melilla"
+        };
+
+        const todasLasComunidades = [...new Set(Object.values(mapProvinciaComunidad))];
+
+        // --- PISTAS MNEMOTÉCNICAS PARA SOFÍA ---
+        const pistasProvincias = {
+            "a coruña": "En la esquina de arriba a la izquierda. ¡Parece la punta de un cuerno de rinoceronte!",
+            "alava": "Es la única del País Vasco que está abajo y no toca el mar.",
+            "albacete": "Al este de Castilla-La Mancha. ¡Es muy redondita!",
+            "alicante": "La puntita de abajo de la Comunidad Valenciana. Parece un triángulo acostado.",
+            "almeria": "En la esquina de abajo a la derecha de Andalucía. ¡Aquí hay desiertos de película!",
+            "asturias": "En la costa del norte. Es un bloque alargado entre Galicia y Cantabria.",
+            "avila": "A la izquierda de Madrid. Es pequeñita y redonda, ¡como una ciudad amurallada!",
+            "badajoz": "La provincia más grande de España. Es toda la mitad de abajo de Extremadura.",
+            "barcelona": "En la costa de Cataluña. Su forma tiene un 'bocado' pequeñito del mar.",
+            "burgos": "Arriba en Castilla y León. Su lado derecho parece el perfil de una cara mirando hacia Aragón.",
+            "caceres": "La mitad de arriba de Extremadura. Está pegadita a Portugal.",
+            "cadiz": "La puntita más al sur de España. ¡Si la miras bien, tiene forma de botita o zapato de tacón!",
+            "cantabria": "Pequeñita en el norte. Tiene forma de cuña o una pieza de Tetris entre Asturias y País Vasco.",
+            "castellon": "Es la provincia de más arriba en la Comunidad Valenciana.",
+            "ciudad real": "Al sur de Toledo, es gigantesca. ¡Aquí peleó Don Quijote contra los molinos de viento!",
+            "cordoba": "En el norte de Andalucía. Tiene forma de escudo o cabeza grande.",
+            "cuenca": "A la derecha de Madrid. ¡Tiene forma de un dedo pulgar gigante apuntando hacia arriba!",
+            "girona": "En la esquina de arriba a la derecha de toda España, tocando a Francia.",
+            "granada": "En la costa de Andalucía. Aquí están las montañas con nieve (Sierra Nevada).",
+            "guadalajara": "Arriba a la derecha de Madrid. Parece que abraza a Madrid por ese lado.",
+            "gipuzkoa": "La más chiquitita de todas en la costa norte, tocando la frontera con Francia.",
+            "guipuzcoa": "La más chiquitita de todas en la costa norte, tocando la frontera con Francia.",
+            "huelva": "En la esquina de abajo a la izquierda de España. ¡De aquí salieron los barcos a América!",
+            "huesca": "Arriba del todo en Aragón, tocando las montañas altas de los Pirineos.",
+            "jaen": "Al norte de Andalucía. ¡Todo está lleno de árboles de aceitunas!",
+            "la rioja": "Muy pequeñita y alargada. Está escondida justo debajo del País Vasco.",
+            "leon": "En la esquina del noroeste de Castilla y León. ¡Su forma recuerda un poco a un león tumbado!",
+            "lleida": "La única de Cataluña que no tiene playa. Es muy alta y montañosa.",
+            "lugo": "En Galicia, arriba a la derecha. Tiene forma de rectángulo de pie.",
+            "madrid": "¡Justo en el centro del mapa! Parece una estrellita o un corazón irregular.",
+            "malaga": "En la parte de abajo de Andalucía. Tiene forma de tira frente al mar.",
+            "murcia": "En la esquina sureste, abajo a la derecha. ¡Está encajada entre Valencia y Andalucía!",
+            "navarra": "En el norte. ¡Tiene forma de diamante o de un león con la boca abierta rugiendo hacia abajo!",
+            "ourense": "La única de Galicia que está abajo y no toca el mar, pegada a Portugal.",
+            "palencia": "En el centro-norte. Es muy larga y delgada de arriba a abajo, ¡como un bastón!",
+            "pontevedra": "En la costa de Galicia, en el lado izquierdo. ¡Llenita de mariscos ricos!",
+            "salamanca": "Al oeste, tocando Portugal. Tiene forma de cuadrado inclinado.",
+            "segovia": "Justo arriba de Madrid. ¡Tiene forma de una 'L' invertida o un calcetín navideño!",
+            "sevilla": "En el centro y abajo de Andalucía. ¡Es por donde pasa el río grande (Guadalquivir)!",
+            "soria": "A la derecha del todo de Castilla y León. ¡Es redondita y muy tranquila!",
+            "tarragona": "La parte de abajo de Cataluña, tocando el mar.",
+            "teruel": "Abajo en Aragón. Tiene forma de triángulo invertido y está ¡llena de huesos de dinosaurio!",
+            "toledo": "Justo debajo de Madrid. ¡Es enorme y parece un pájaro con las alas abiertas!",
+            "valencia": "En el centro de la costa este, frente al mar. ¡Es la cuna de la paella!",
+            "valladolid": "En el centro de Castilla y León. ¡Está rodeada por un montón de provincias amigas!",
+            "bizkaia": "En la costa del País Vasco, con una pequeña forma de 'C'.",
+            "vizcaya": "En la costa del País Vasco, con una pequeña forma de 'C'.",
+            "zamora": "En el oeste, tocando Portugal. Tiene un lado muy recto que es la frontera.",
+            "zaragoza": "En el centro de Aragón, ¡el río Ebro la corta como si fuera una rebanada de pastel!",
+            "illes balears": "¡Son las islas que están sueltas en el mar a la derecha (Mediterráneo)!",
+            "baleares": "¡Son las islas que están sueltas en el mar a la derecha (Mediterráneo)!",
+            "las palmas": "El grupito de islas Canarias que está en el lado derecho.",
+            "santa cruz de tenerife": "El grupito de islas Canarias que está en el lado izquierdo.",
+            "ceuta": "Una ciudad pequeñita que está al otro lado del mar, ¡en el norte de África!",
+            "melilla": "Otra ciudad pequeñita en África, más a la derecha que Ceuta."
+        };
+
+        // Función para normalizar nombres (quitar acentos para la lógica interna)
+        function normalizarNombre(nombre) {
+            return nombre.toLowerCase()
+                .replaceAll("á", "a").replaceAll("é", "e").replaceAll("í", "i")
+                .replaceAll("ó", "o").replaceAll("ú", "u").replaceAll("ü", "u");
+                // Nota: Mantenemos la "ñ" tal cual para que coincida con "a coruña"
+        }
+
+        function obtenerComunidad(nombreProvincia) {
+            const key = normalizarNombre(nombreProvincia);
+            return mapProvinciaComunidad[key] || mapProvinciaComunidad[nombreProvincia.toLowerCase()] || "Comunidad Desconocida";
+        }
+
+        function obtenerPista(nombreProvincia) {
+            const key = normalizarNombre(nombreProvincia);
+            return pistasProvincias[key] || pistasProvincias[nombreProvincia.toLowerCase()] || "¡Explora el mapa para memorizar su forma secreta!";
+        }
+
+        // --- ESTADO DEL JUEGO ---
+        let map, geojsonLayer;
+        let provinciasFeatures = [];
+        let currentMode = 'explore';
+        let score = 0;
+        let currentTargetFeature = null;
+
+        // --- INICIALIZACIÓN DEL MAPA ---
+        function initMap() {
+            map = L.map('map', { zoomControl: false }).setView([40.4637, -3.7492], 6);
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+                subdomains: 'abcd',
+                maxZoom: 10,
+                minZoom: 5
+            }).addTo(map);
+
+            loadGeoJSON();
+        }
+
+        // --- CARGA DE DATOS ---
+        function loadGeoJSON() {
+            const geojsonUrl = 'https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/spain-provinces.geojson';
+
+            fetch(geojsonUrl)
+                .then(response => response.json())
+                .then(data => {
+                    provincesFeatures = data.features;
+                    geojsonLayer = L.geoJSON(data, {
+                        style: defaultStyle,
+                        onEachFeature: onEachFeature
+                    }).addTo(map);
+
+                    map.fitBounds(geojsonLayer.getBounds(), { padding: [20, 20] });
+                    document.getElementById('loading').classList.add('hidden');
+                    document.getElementById('game-content').classList.remove('hidden');
+                    document.getElementById('game-content').classList.add('flex');
+                    setMode('explore');
+                })
+                .catch(err => {
+                    console.error(err);
+                    document.getElementById('loading').innerText = "Ups, el mapa se voló con el viento. ¡Recarga la página!";
+                    document.getElementById('loading').classList.replace('text-gray-500', 'text-red-500');
+                });
+        }
+
+        // --- ESTILOS DEL MAPA ---
+        function defaultStyle() {
+            return { fillColor: '#ffffff', weight: 2, color: '#94a3b8', fillOpacity: 0.7 };
+        }
+        function highlightStyle(isTarget = false) {
+            return { fillColor: isTarget ? '#a855f7' : '#2dd4bf', weight: 3, color: '#334155', fillOpacity: 0.9 };
+        }
+        function successStyle() { return { fillColor: '#4ade80', weight: 3, color: '#166534', fillOpacity: 0.9 }; }
+        function errorStyle() { return { fillColor: '#f87171', weight: 3, color: '#991b1b', fillOpacity: 0.9 }; }
+
+        // --- INTERACCIONES DEL MAPA ---
+        function onEachFeature(feature, layer) {
+            layer.on({
+                mouseover: (e) => handleHover(e, feature),
+                mouseout: (e) => handleMouseOut(e),
+                click: (e) => handleClick(e, feature, layer)
+            });
+        }
+
+        function handleHover(e, feature) {
+            const layer = e.target;
+            const provName = feature.properties.name;
+            const comName = obtenerComunidad(provName);
+            const pista = obtenerPista(provName);
+
+            if (currentMode === 'explore') {
+                layer.setStyle(highlightStyle());
+                layer.bringToFront();
+
+                // Mostrar tooltip de exploración con pista
+                const infoDiv = document.getElementById('explore-info');
+                document.getElementById('info-prov').innerText = provName;
+                document.getElementById('info-com').innerText = comName;
+                document.getElementById('info-pista').innerText = pista;
+                infoDiv.classList.remove('hidden');
+            } else if (currentMode === 'guess_prov') {
+                layer.setStyle({ fillOpacity: 0.9 });
+            }
+        }
+
+        function handleMouseOut(e) {
+            const layer = e.target;
+            if (!(currentMode === 'guess_com' && currentTargetFeature && layer.feature === currentTargetFeature)) {
+                geojsonLayer.resetStyle(layer);
+            }
+            document.getElementById('explore-info').classList.add('hidden');
+        }
+
+        function handleClick(e, feature, layer) {
+            if (currentMode === 'explore') {
+                lanzarConfeti(e.originalEvent.clientX, e.originalEvent.clientY, 20);
+
+            } else if (currentMode === 'guess_prov') {
+                if (!currentTargetFeature) return;
+
+                if (feature.properties.name === currentTargetFeature.properties.name) {
+                    layer.setStyle(successStyle());
+                    sumarPunto();
+                    mostrarFeedback("¡Súper bien, Sofía! Es " + feature.properties.name + " 🎒", "success");
+                    lanzarConfeti(e.originalEvent.clientX, e.originalEvent.clientY);
+
+                    setTimeout(() => {
+                        geojsonLayer.resetStyle(layer);
+                        siguientePreguntaProvincia();
+                    }, 1500);
+                } else {
+                    layer.setStyle(errorStyle());
+                    mostrarFeedback("¡Uy, casi! Esa es " + feature.properties.name + ", ¡sigue buscando!", "error");
+                    setTimeout(() => geojsonLayer.resetStyle(layer), 1500);
+                }
+            }
+        }
+
+        // --- LÓGICA DE MODOS DE JUEGO ---
+        function setMode(mode) {
+            currentMode = mode;
+            currentTargetFeature = null;
+
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('border-teal-500', 'border-blue-500', 'border-purple-500', 'ring-4');
+                btn.classList.add('border-transparent', 'opacity-70');
+            });
+
+            const activeBtn = document.getElementById(`btn-${mode}`);
+            activeBtn.classList.remove('border-transparent', 'opacity-70');
+
+            document.getElementById('multiple-choice').classList.add('hidden');
+            document.getElementById('explore-info').classList.add('hidden');
+            document.getElementById('feedback').classList.add('hidden');
+            document.getElementById('btn-pista').classList.add('hidden');
+            document.getElementById('pista-activa').classList.add('hidden');
+
+            geojsonLayer.eachLayer(layer => geojsonLayer.resetStyle(layer));
+
+            const title = document.getElementById('game-prompt-title');
+            const prompt = document.getElementById('game-prompt');
+
+            if (mode === 'explore') {
+                activeBtn.classList.add('border-teal-500', 'ring-4', 'ring-teal-200');
+                title.innerText = "¡Hola exploradora!";
+                prompt.innerHTML = "Toca las provincias para <br><span class='text-lg font-normal text-gray-500'>leer los trucos de memoria de tu diario.</span>";
+            }
+            else if (mode === 'guess_prov') {
+                activeBtn.classList.add('border-blue-500', 'ring-4', 'ring-blue-200');
+                siguientePreguntaProvincia();
+            }
+            else if (mode === 'guess_com') {
+                activeBtn.classList.add('border-purple-500', 'ring-4', 'ring-purple-200');
+                siguientePreguntaComunidad();
+            }
+        }
+
+        function siguientePreguntaProvincia() {
+            document.getElementById('feedback').classList.add('hidden');
+            document.getElementById('pista-activa').classList.add('hidden');
+            document.getElementById('btn-pista').classList.remove('hidden'); // Mostrar botón de pista
+
+            currentTargetFeature = provincesFeatures[Math.floor(Math.random() * provincesFeatures.length)];
+
+            document.getElementById('game-prompt-title').innerText = "Apunta tu brújula hacia:";
+            document.getElementById('game-prompt').innerText = currentTargetFeature.properties.name;
+        }
+
+        // Mostrar pista al usuario
+        function mostrarPista() {
+            if (!currentTargetFeature) return;
+            const provName = currentTargetFeature.properties.name;
+            const pista = obtenerPista(provName);
+
+            document.getElementById('btn-pista').classList.add('hidden');
+            document.getElementById('pista-texto').innerText = pista;
+            document.getElementById('pista-activa').classList.remove('hidden');
+        }
+
+        function siguientePreguntaComunidad() {
+            document.getElementById('feedback').classList.add('hidden');
+
+            currentTargetFeature = provincesFeatures[Math.floor(Math.random() * provincesFeatures.length)];
+            const provName = currentTargetFeature.properties.name;
+            const correctComunidad = obtenerComunidad(provName);
+
+            geojsonLayer.eachLayer(layer => {
+                if (layer.feature === currentTargetFeature) {
+                    layer.setStyle(highlightStyle(true));
+                    layer.bringToFront();
+                } else {
+                    geojsonLayer.resetStyle(layer);
+                }
+            });
+
+            document.getElementById('game-prompt-title').innerText = "Sofía, ¿A qué Comunidad pertenece...";
+            document.getElementById('game-prompt').innerText = provName + "?";
+
+            let opciones = [correctComunidad];
+            while (opciones.length < 4) {
+                const randomCom = todasLasComunidades[Math.floor(Math.random() * todasLasComunidades.length)];
+                if (!opciones.includes(randomCom)) { opciones.push(randomCom); }
+            }
+
+            for (let i = opciones.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [opciones[i], opciones[j]] = [opciones[j], opciones[i]];
+            }
+
+            const btnContainer = document.getElementById('multiple-choice');
+            btnContainer.innerHTML = '';
+            btnContainer.classList.remove('hidden');
+
+            opciones.forEach(opcion => {
+                const btn = document.createElement('button');
+                btn.className = "w-full py-3 px-4 bg-white border-2 border-slate-200 hover:border-purple-500 hover:bg-purple-50 rounded-xl font-bold text-slate-700 transition-all text-left shadow-sm";
+                btn.innerText = opcion;
+                btn.onclick = () => verificarComunidad(opcion, correctComunidad, btn);
+                btnContainer.appendChild(btn);
+            });
+        }
+
+        function verificarComunidad(seleccion, correcta, btnElement) {
+            const botones = document.querySelectorAll('#multiple-choice button');
+            botones.forEach(b => b.disabled = true);
+
+            if (seleccion === correcta) {
+                btnElement.classList.replace('border-slate-200', 'border-green-500');
+                btnElement.classList.replace('hover:border-purple-500', 'bg-green-100');
+                btnElement.classList.replace('hover:bg-purple-50', 'text-green-800');
+
+                sumarPunto();
+                mostrarFeedback("¡Excelente, Sofía! Eres una gran exploradora 🎉", "success");
+                lanzarConfetiCentral();
+                setTimeout(siguientePreguntaComunidad, 2000);
+            } else {
+                btnElement.classList.replace('border-slate-200', 'border-red-500');
+                btnElement.classList.replace('hover:border-purple-500', 'bg-red-100');
+                btnElement.classList.replace('hover:bg-purple-50', 'text-red-800');
+
+                botones.forEach(b => {
+                    if (b.innerText === correcta) {
+                        b.classList.replace('border-slate-200', 'border-green-500');
+                        b.classList.add('bg-green-50');
+                    }
+                });
+
+                mostrarFeedback("Oh no, Sofía. Pertenece a " + correcta + ". ¡A la próxima seguro aciertas!", "error");
+                setTimeout(siguientePreguntaComunidad, 3000);
+            }
+        }
+
+        // --- SISTEMA DE PUNTOS Y FEEDBACK ---
+        function sumarPunto() {
+            score += 10;
+            const scoreEl = document.getElementById('score');
+            scoreEl.innerText = score;
+            scoreEl.classList.add('animate-bounce-short');
+            setTimeout(() => scoreEl.classList.remove('animate-bounce-short'), 500);
+        }
+
+        function mostrarFeedback(mensaje, tipo) {
+            const fb = document.getElementById('feedback');
+            fb.innerText = mensaje;
+            fb.className = "mt-auto font-bold text-lg p-3 rounded-xl w-full transition-all animate-bounce-short text-center shadow-sm ";
+
+            if (tipo === 'success') {
+                fb.classList.add('bg-green-100', 'text-green-800', 'border-2', 'border-green-400');
+            } else {
+                fb.classList.add('bg-red-100', 'text-red-800', 'border-2', 'border-red-400');
+            }
+            fb.classList.remove('hidden');
+        }
+
+        // --- EFECTOS DIVERTIDOS (CONFETI) ---
+        function lanzarConfeti(x, y, particulas = 50) {
+            const xPercent = x / window.innerWidth;
+            const yPercent = y / window.innerHeight;
+            confetti({ particleCount: particulas, spread: 70, origin: { x: xPercent, y: yPercent }, colors: ['#2dd4bf', '#a855f7', '#fbbf24', '#f87171'] });
+        }
+
+        function lanzarConfetiCentral() {
+            confetti({ particleCount: 100, spread: 100, origin: { y: 0.6 }, colors: ['#4ade80', '#3b82f6', '#fbbf24'] });
+        }
+
+        window.onload = initMap;
+    </script>
+</body>
+</html>
