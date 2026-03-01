@@ -54,6 +54,8 @@
         .ring-azul { --tw-ring-color: rgba(45, 64, 223, 0.35); }
         .bdr-purpura { border-color: #7537C8; }
         .ring-purpura { --tw-ring-color: rgba(117, 55, 200, 0.35); }
+        .bdr-amarillo { border-color: #F1DC1B; }
+        .ring-amarillo { --tw-ring-color: rgba(241, 220, 27, 0.35); }
     </style>
 </head>
 <body class="h-screen w-screen flex flex-col overflow-hidden text-slate-800">
@@ -64,9 +66,9 @@
             🎒 ¡La expedición de Sofía! 🇲🇽 ✈️ 🇪🇸
         </h1>
         <div id="exam-progress" class="hidden flex rounded-full px-4 py-1 font-bold text-lg items-center gap-3 shadow-inner" style="background: rgba(0,0,0,0.2);">
-            <span>Pregunta <span id="exam-current" class="text-amarillo">0</span>/<span id="exam-total">52</span></span>
+            <span><span id="progress-label">Pregunta</span> <span id="exam-current" class="text-amarillo">0</span>/<span id="exam-total">52</span></span>
             <span class="opacity-40">|</span>
-            <span>Aciertos: <span id="exam-correct" class="text-amarillo">0</span></span>
+            <span><span id="correct-label">Aciertos</span>: <span id="exam-correct" class="text-amarillo">0</span></span>
         </div>
     </header>
 
@@ -81,13 +83,16 @@
                 <h2 class="text-xl font-title font-bold mb-3 text-purpura">Diario de viaje:</h2>
                 <div class="flex flex-col gap-2">
                     <button onclick="setMode('explore')" id="btn-explore" class="mode-btn bg-turquesa/10 hover:bg-turquesa/20 text-turquesa font-bold py-2.5 px-4 rounded-xl transition-all border-2 border-transparent text-left flex items-center gap-2">
-                        🧭 Sofía explora libremente
+                        🧭 Explorar libremente
+                    </button>
+                    <button onclick="setMode('practice')" id="btn-practice" class="mode-btn bg-amarillo/10 hover:bg-amarillo/20 text-amber-700 font-bold py-2.5 px-4 rounded-xl transition-all border-2 border-transparent text-left flex items-center gap-2">
+                        📚 Practicar por comunidad
                     </button>
                     <button onclick="setMode('guess_prov')" id="btn-guess_prov" class="mode-btn bg-azul/10 hover:bg-azul/20 text-azul font-bold py-2.5 px-4 rounded-xl transition-all border-2 border-transparent text-left flex items-center gap-2">
-                        🗺️ Sofía busca la provincia
+                        🗺️ Examen: buscar provincia
                     </button>
                     <button onclick="setMode('guess_com')" id="btn-guess_com" class="mode-btn bg-purpura/10 hover:bg-purpura/20 text-purpura font-bold py-2.5 px-4 rounded-xl transition-all border-2 border-transparent text-left flex items-center gap-2">
-                        🧩 El gran reto de las Comunidades
+                        🧩 Examen: comunidades
                     </button>
                 </div>
             </div>
@@ -118,6 +123,13 @@
 
                     <!-- Mensaje de Feedback -->
                     <div id="feedback" class="mt-auto font-bold text-lg p-3 rounded-xl w-full hidden transition-all"></div>
+                </div>
+
+                <!-- Selector de Comunidades para modo práctica -->
+                <div id="community-picker" class="hidden flex-col items-center text-center h-full overflow-y-auto">
+                    <h3 class="text-sm uppercase tracking-wide text-amber-600 font-bold mb-1">Modo práctica</h3>
+                    <p class="text-lg font-black text-slate-700 mb-3">¿Qué comunidad quieres practicar?</p>
+                    <div id="community-list" class="w-full flex flex-col gap-1.5"></div>
                 </div>
             </div>
 
@@ -302,6 +314,13 @@
         let examCurrent = 0;
         let waitingForNext = false;
 
+        // Estado del modo práctica
+        let practiceQueue = [];
+        let practiceFound = 0;
+        let practiceTotalInCommunity = 0;
+        let currentCommunityName = '';
+        let completedCommunities = new Set();
+
         function shuffleArray(arr) {
             const shuffled = [...arr];
             for (let i = shuffled.length - 1; i > 0; i--) {
@@ -317,6 +336,8 @@
             examCorrect = 0;
             examCurrent = 0;
             waitingForNext = false;
+            document.getElementById('progress-label').innerText = 'Pregunta';
+            document.getElementById('correct-label').innerText = 'Aciertos';
             actualizarProgreso();
             document.getElementById('exam-progress').classList.remove('hidden');
         }
@@ -402,7 +423,7 @@
                 document.getElementById('info-com').innerText = comName;
                 document.getElementById('info-pista').innerText = pista;
                 infoDiv.classList.remove('hidden');
-            } else if (currentMode === 'guess_prov' && !waitingForNext) {
+            } else if ((currentMode === 'guess_prov' || currentMode === 'practice') && !waitingForNext) {
                 layer.setStyle({ fillOpacity: 0.9 });
             }
         }
@@ -454,6 +475,62 @@
                         siguientePreguntaProvincia();
                     }, 2500);
                 }
+
+            } else if (currentMode === 'practice') {
+                if (!currentTargetFeature || waitingForNext) return;
+
+                if (feature.properties.name === currentTargetFeature.properties.name) {
+                    waitingForNext = true;
+                    layer.setStyle(successStyle());
+                    document.getElementById('exam-correct').innerText = practiceFound;
+                    mostrarFeedback("¡Muy bien! " + feature.properties.name + " ✨", "success");
+                    lanzarConfeti(e.originalEvent.clientX, e.originalEvent.clientY);
+
+                    setTimeout(() => {
+                        // Re-colorear provincias de la comunidad
+                        geojsonLayer.eachLayer(l => {
+                            const lCom = obtenerComunidad(l.feature.properties.name);
+                            if (l.feature === feature) {
+                                // Ya encontrada: dejar en verde suave
+                                l.setStyle({ fillColor: '#1CC4AB', fillOpacity: 0.5, weight: 2, color: '#065f46' });
+                            } else if (lCom === currentCommunityName) {
+                                l.setStyle({ fillColor: '#F1DC1B', fillOpacity: 0.35, weight: 2, color: '#c4b5fd' });
+                            } else {
+                                geojsonLayer.resetStyle(l);
+                            }
+                        });
+                        siguientePreguntaPractica();
+                    }, 1500);
+                } else {
+                    waitingForNext = true;
+                    layer.setStyle(errorStyle());
+
+                    // Mostrar la correcta en verde
+                    geojsonLayer.eachLayer(l => {
+                        if (l.feature === currentTargetFeature) {
+                            l.setStyle(successStyle());
+                            l.bringToFront();
+                        }
+                    });
+
+                    // Re-agregar al final de la cola para repetir
+                    practiceQueue.unshift(currentTargetFeature);
+                    practiceFound--; // No contar este intento
+
+                    mostrarFeedback("¡Casi! Era " + currentTargetFeature.properties.name + ". ¡Volverá a salir!", "error");
+
+                    setTimeout(() => {
+                        geojsonLayer.eachLayer(l => {
+                            const lCom = obtenerComunidad(l.feature.properties.name);
+                            if (lCom === currentCommunityName) {
+                                l.setStyle({ fillColor: '#F1DC1B', fillOpacity: 0.35, weight: 2, color: '#c4b5fd' });
+                            } else {
+                                geojsonLayer.resetStyle(l);
+                            }
+                        });
+                        siguientePreguntaPractica();
+                    }, 2500);
+                }
             }
         }
 
@@ -464,7 +541,7 @@
             waitingForNext = false;
 
             document.querySelectorAll('.mode-btn').forEach(btn => {
-                btn.classList.remove('bdr-turquesa', 'bdr-azul', 'bdr-purpura', 'ring-4', 'ring-turquesa', 'ring-azul', 'ring-purpura');
+                btn.classList.remove('bdr-turquesa', 'bdr-azul', 'bdr-purpura', 'bdr-amarillo', 'ring-4', 'ring-turquesa', 'ring-azul', 'ring-purpura', 'ring-amarillo');
                 btn.classList.add('border-transparent', 'opacity-70');
             });
 
@@ -476,6 +553,9 @@
             document.getElementById('feedback').classList.add('hidden');
             document.getElementById('btn-pista').classList.add('hidden');
             document.getElementById('pista-activa').classList.add('hidden');
+            document.getElementById('community-picker').classList.add('hidden');
+            document.getElementById('game-content').classList.add('hidden');
+            document.getElementById('game-content').classList.remove('flex');
 
             geojsonLayer.eachLayer(layer => geojsonLayer.resetStyle(layer));
 
@@ -485,16 +565,29 @@
             if (mode === 'explore') {
                 activeBtn.classList.add('bdr-turquesa', 'ring-4', 'ring-turquesa');
                 document.getElementById('exam-progress').classList.add('hidden');
+                document.getElementById('game-content').classList.remove('hidden');
+                document.getElementById('game-content').classList.add('flex');
                 title.innerText = "¡Hola exploradora!";
                 prompt.innerHTML = "Toca las provincias para <br><span class='text-lg font-normal text-gray-500'>leer los trucos de memoria de tu diario.</span>";
             }
+            else if (mode === 'practice') {
+                activeBtn.classList.add('bdr-amarillo', 'ring-4', 'ring-amarillo');
+                document.getElementById('exam-progress').classList.add('hidden');
+                document.getElementById('community-picker').classList.remove('hidden');
+                document.getElementById('community-picker').classList.add('flex');
+                showCommunityPicker();
+            }
             else if (mode === 'guess_prov') {
                 activeBtn.classList.add('bdr-azul', 'ring-4', 'ring-azul');
+                document.getElementById('game-content').classList.remove('hidden');
+                document.getElementById('game-content').classList.add('flex');
                 iniciarExamen();
                 siguientePreguntaProvincia();
             }
             else if (mode === 'guess_com') {
                 activeBtn.classList.add('bdr-purpura', 'ring-4', 'ring-purpura');
+                document.getElementById('game-content').classList.remove('hidden');
+                document.getElementById('game-content').classList.add('flex');
                 iniciarExamen();
                 siguientePreguntaComunidad();
             }
@@ -528,6 +621,125 @@
             document.getElementById('btn-pista').classList.add('hidden');
             document.getElementById('pista-texto').innerText = pista;
             document.getElementById('pista-activa').classList.remove('hidden');
+        }
+
+        // --- MODO PRÁCTICA POR COMUNIDAD ---
+        function buildCommunityMap() {
+            const comMap = {};
+            provincesFeatures.forEach(f => {
+                const com = obtenerComunidad(f.properties.name);
+                if (!comMap[com]) comMap[com] = [];
+                comMap[com].push(f);
+            });
+            return comMap;
+        }
+
+        function showCommunityPicker() {
+            const comMap = buildCommunityMap();
+            const container = document.getElementById('community-list');
+            container.innerHTML = '';
+
+            // Ordenar comunidades alfabéticamente
+            const sorted = Object.keys(comMap).sort();
+
+            sorted.forEach(comName => {
+                const count = comMap[comName].length;
+                const done = completedCommunities.has(comName);
+                const btn = document.createElement('button');
+                btn.className = `w-full py-2.5 px-4 rounded-xl font-bold transition-all text-left flex items-center justify-between gap-2 border-2 shadow-sm ${done ? 'bg-turquesa/10 border-turquesa/40 text-turquesa' : 'bg-white border-slate-200 hover:border-amarillo hover:bg-amarillo/5 text-slate-700'}`;
+                btn.innerHTML = `<span>${done ? '✅ ' : ''}${comName}</span><span class="text-sm font-normal opacity-60">${count} prov.</span>`;
+                if (!done) {
+                    btn.onclick = () => startPractice(comName, comMap[comName]);
+                }
+                container.appendChild(btn);
+            });
+        }
+
+        function startPractice(comName, features) {
+            currentCommunityName = comName;
+            practiceQueue = shuffleArray(features);
+            practiceTotalInCommunity = features.length;
+            practiceFound = 0;
+            waitingForNext = false;
+
+            document.getElementById('community-picker').classList.add('hidden');
+            document.getElementById('game-content').classList.remove('hidden');
+            document.getElementById('game-content').classList.add('flex');
+
+            // Actualizar header
+            document.getElementById('progress-label').innerText = 'Provincia';
+            document.getElementById('correct-label').innerText = 'Encontradas';
+            const prog = document.getElementById('exam-progress');
+            prog.classList.remove('hidden');
+            document.getElementById('exam-total').innerText = practiceTotalInCommunity;
+            document.getElementById('exam-current').innerText = 0;
+            document.getElementById('exam-correct').innerText = 0;
+
+            // Colorear todas las provincias de esta comunidad sutilmente
+            geojsonLayer.eachLayer(l => {
+                const lCom = obtenerComunidad(l.feature.properties.name);
+                if (lCom === comName) {
+                    l.setStyle({ fillColor: '#F1DC1B', fillOpacity: 0.35, weight: 2, color: '#c4b5fd' });
+                } else {
+                    geojsonLayer.resetStyle(l);
+                }
+            });
+
+            siguientePreguntaPractica();
+        }
+
+        function siguientePreguntaPractica() {
+            document.getElementById('feedback').classList.add('hidden');
+            waitingForNext = false;
+
+            if (practiceQueue.length === 0) {
+                mostrarResultadosPractica();
+                return;
+            }
+
+            currentTargetFeature = practiceQueue.pop();
+            practiceFound++;
+
+            document.getElementById('exam-current').innerText = practiceFound;
+            document.getElementById('exam-correct').innerText = practiceFound - 1;
+
+            // Mostrar pista siempre en modo práctica
+            const provName = currentTargetFeature.properties.name;
+            const pista = obtenerPista(provName);
+            document.getElementById('btn-pista').classList.add('hidden');
+            document.getElementById('pista-texto').innerText = pista;
+            document.getElementById('pista-activa').classList.remove('hidden');
+
+            document.getElementById('game-prompt-title').innerText = `${currentCommunityName} — Provincia ${practiceFound} de ${practiceTotalInCommunity}`;
+            document.getElementById('game-prompt').innerText = provName;
+        }
+
+        function mostrarResultadosPractica() {
+            currentTargetFeature = null;
+            waitingForNext = true;
+            completedCommunities.add(currentCommunityName);
+
+            document.getElementById('game-prompt-title').innerText = "¡Comunidad completada!";
+            document.getElementById('game-prompt').innerHTML =
+                `<div class="text-4xl mb-2">🎉🌟</div>` +
+                `<div class="text-2xl font-black text-turquesa">${currentCommunityName}</div>` +
+                `<div class="text-lg text-gray-500 mt-1">¡Todas las ${practiceTotalInCommunity} provincias encontradas!</div>` +
+                `<button onclick="setMode('practice')" class="mt-4 bg-amarillo/20 hover:bg-amarillo/30 text-amber-800 py-2.5 px-6 rounded-xl font-bold transition-all border border-amarillo/50 shadow-sm">📚 Elegir otra comunidad</button>`;
+
+            document.getElementById('pista-activa').classList.add('hidden');
+            document.getElementById('feedback').classList.add('hidden');
+
+            geojsonLayer.eachLayer(layer => {
+                const lCom = obtenerComunidad(layer.feature.properties.name);
+                if (lCom === currentCommunityName) {
+                    layer.setStyle(successStyle());
+                } else {
+                    geojsonLayer.resetStyle(layer);
+                }
+            });
+
+            lanzarConfetiCentral();
+            setTimeout(lanzarConfetiCentral, 500);
         }
 
         function siguientePreguntaComunidad() {
