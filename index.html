@@ -12,37 +12,61 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&family=Caveat:wght@600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&family=Fredoka:wght@500;600;700&family=Caveat:wght@600&display=swap" rel="stylesheet">
+
+    <script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                colors: {
+                    coral: '#F8464A',
+                    purpura: '#7537C8',
+                    azul: '#2D40DF',
+                    turquesa: '#1CC4AB',
+                    amarillo: '#F1DC1B',
+                }
+            }
+        }
+    }
+    </script>
 
     <style>
-        body { font-family: 'Nunito', sans-serif; background-color: #f0fdfa; }
-        .font-diario { font-family: 'Caveat', cursive; } /* Fuente de escritura a mano para las pistas */
+        body { font-family: 'Nunito', sans-serif; background: linear-gradient(135deg, #f0e6fa 0%, #e6eafa 40%, #e0f7f3 100%); }
+        .font-title { font-family: 'Fredoka', sans-serif; }
+        .font-diario { font-family: 'Caveat', cursive; }
 
-        #map { background-color: #bae6fd; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        #map { background-color: #e6eafa; border-radius: 1rem; box-shadow: 0 8px 25px -5px rgba(117, 55, 200, 0.2); }
         .leaflet-interactive { transition: fill 0.2s ease, fill-opacity 0.2s ease; }
 
-        /* Animaciones divertidas */
         @keyframes bounce-short {
             0%, 100% { transform: translateY(0); }
             50% { transform: translateY(-5px); }
         }
         .animate-bounce-short { animation: bounce-short 0.5s ease-in-out; }
 
-        /* Ocultar barra de scroll en panel de opciones */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Palette classes for JS-controlled dynamic borders/rings */
+        .bdr-turquesa { border-color: #1CC4AB; }
+        .ring-turquesa { --tw-ring-color: rgba(28, 196, 171, 0.35); }
+        .bdr-azul { border-color: #2D40DF; }
+        .ring-azul { --tw-ring-color: rgba(45, 64, 223, 0.35); }
+        .bdr-purpura { border-color: #7537C8; }
+        .ring-purpura { --tw-ring-color: rgba(117, 55, 200, 0.35); }
     </style>
 </head>
 <body class="h-screen w-screen flex flex-col overflow-hidden text-slate-800">
 
     <!-- Encabezado -->
-    <header class="bg-teal-600 text-white p-4 shadow-md z-10 flex flex-col sm:flex-row justify-between items-center gap-2">
-        <h1 class="text-2xl sm:text-3xl font-black flex items-center gap-2">
+    <header class="text-white p-4 shadow-lg z-10 flex flex-col sm:flex-row justify-between items-center gap-2" style="background: linear-gradient(135deg, #7537C8, #2D40DF);">
+        <h1 class="text-2xl sm:text-3xl font-title font-bold flex items-center gap-2 drop-shadow-md">
             🎒 ¡La expedición de Sofía! 🇲🇽 ✈️ 🇪🇸
         </h1>
-        <div class="flex bg-teal-800 rounded-full px-4 py-1 font-bold text-lg items-center gap-2 shadow-inner">
-            <span>Millas de viajera:</span>
-            <span id="score" class="text-yellow-300 text-2xl">0</span>
+        <div id="exam-progress" class="hidden flex rounded-full px-4 py-1 font-bold text-lg items-center gap-3 shadow-inner" style="background: rgba(0,0,0,0.2);">
+            <span>Pregunta <span id="exam-current" class="text-amarillo">0</span>/<span id="exam-total">52</span></span>
+            <span class="opacity-40">|</span>
+            <span>Aciertos: <span id="exam-correct" class="text-amarillo">0</span></span>
         </div>
     </header>
 
@@ -53,23 +77,23 @@
         <aside class="w-full md:w-1/3 lg:w-1/4 flex flex-col gap-4 overflow-y-auto no-scrollbar">
 
             <!-- Selector de Modos -->
-            <div class="bg-white p-4 rounded-2xl shadow-md border-t-4 border-teal-500 flex-shrink-0">
-                <h2 class="text-xl font-bold mb-3 text-teal-700">Diario de viaje:</h2>
+            <div class="bg-white/90 backdrop-blur-sm p-4 rounded-2xl shadow-md border-t-4 border-purpura flex-shrink-0">
+                <h2 class="text-xl font-title font-bold mb-3 text-purpura">Diario de viaje:</h2>
                 <div class="flex flex-col gap-2">
-                    <button onclick="setMode('explore')" id="btn-explore" class="mode-btn bg-teal-100 hover:bg-teal-200 text-teal-800 font-bold py-2 px-4 rounded-xl transition-colors border-2 border-transparent text-left flex items-center gap-2">
+                    <button onclick="setMode('explore')" id="btn-explore" class="mode-btn bg-turquesa/10 hover:bg-turquesa/20 text-turquesa font-bold py-2.5 px-4 rounded-xl transition-all border-2 border-transparent text-left flex items-center gap-2">
                         🧭 Sofía explora libremente
                     </button>
-                    <button onclick="setMode('guess_prov')" id="btn-guess_prov" class="mode-btn bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold py-2 px-4 rounded-xl transition-colors border-2 border-transparent text-left flex items-center gap-2">
+                    <button onclick="setMode('guess_prov')" id="btn-guess_prov" class="mode-btn bg-azul/10 hover:bg-azul/20 text-azul font-bold py-2.5 px-4 rounded-xl transition-all border-2 border-transparent text-left flex items-center gap-2">
                         🗺️ Sofía busca la provincia
                     </button>
-                    <button onclick="setMode('guess_com')" id="btn-guess_com" class="mode-btn bg-purple-100 hover:bg-purple-200 text-purple-800 font-bold py-2 px-4 rounded-xl transition-colors border-2 border-transparent text-left flex items-center gap-2">
+                    <button onclick="setMode('guess_com')" id="btn-guess_com" class="mode-btn bg-purpura/10 hover:bg-purpura/20 text-purpura font-bold py-2.5 px-4 rounded-xl transition-all border-2 border-transparent text-left flex items-center gap-2">
                         🧩 El gran reto de las Comunidades
                     </button>
                 </div>
             </div>
 
             <!-- Panel de Juego Activo -->
-            <div id="game-panel" class="bg-white p-5 rounded-2xl shadow-md border-t-4 border-yellow-400 flex-1 flex flex-col justify-center min-h-[250px] overflow-y-auto">
+            <div id="game-panel" class="bg-white/90 backdrop-blur-sm p-5 rounded-2xl shadow-md border-t-4 border-amarillo flex-1 flex flex-col justify-center min-h-[250px] overflow-y-auto">
                 <div id="loading" class="text-center text-gray-500 font-bold animate-pulse">
                     Preparando la mochila y la brújula para Sofía... 🗺️🧭
                 </div>
@@ -79,11 +103,11 @@
                     <p id="game-prompt" class="text-2xl font-black text-slate-700 mb-2"></p>
 
                     <!-- Botón y texto de pista para el modo "Buscar Provincia" -->
-                    <button id="btn-pista" onclick="mostrarPista()" class="mb-4 text-sm bg-yellow-100 hover:bg-yellow-200 text-yellow-800 py-2 px-4 rounded-xl font-bold transition-all shadow-sm border border-yellow-300 flex items-center gap-2 hidden">
+                    <button id="btn-pista" onclick="mostrarPista()" class="mb-4 text-sm bg-amarillo/20 hover:bg-amarillo/30 text-amber-800 py-2 px-4 rounded-xl font-bold transition-all shadow-sm border border-amarillo/50 flex items-center gap-2 hidden">
                         💡 Leer pista en el diario
                     </button>
-                    <div id="pista-activa" class="hidden w-full mb-4 bg-yellow-50 border border-yellow-200 p-3 rounded-xl shadow-inner text-left">
-                        <span class="text-xs uppercase font-bold text-yellow-600 block mb-1">Diario de Sofía:</span>
+                    <div id="pista-activa" class="hidden w-full mb-4 bg-amarillo/10 border border-amarillo/30 p-3 rounded-xl shadow-inner text-left">
+                        <span class="text-xs uppercase font-bold text-amber-600 block mb-1">Diario de Sofía:</span>
                         <p id="pista-texto" class="font-diario text-xl text-slate-700 leading-tight"></p>
                     </div>
 
@@ -101,17 +125,17 @@
 
         <!-- Panel Derecho: Mapa -->
         <div class="w-full md:w-2/3 lg:w-3/4 h-[50vh] md:h-full relative">
-            <div id="map" class="w-full h-full border-4 border-white rounded-xl"></div>
+            <div id="map" class="w-full h-full border-4 border-white/70 rounded-xl"></div>
 
             <!-- Overlay informativo para el modo exploración -->
-            <div id="explore-info" class="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm p-4 rounded-xl shadow-lg border-2 border-teal-200 pointer-events-none hidden z-[1000] w-72 md:w-80">
-                <p class="text-xs text-gray-500 font-bold uppercase">Provincia descubierta</p>
-                <p id="info-prov" class="text-2xl font-black text-slate-800 leading-tight"></p>
-                <p id="info-com" class="text-sm font-bold text-teal-600 leading-tight mb-2"></p>
+            <div id="explore-info" class="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm p-4 rounded-xl shadow-lg border-2 border-turquesa/40 pointer-events-none hidden z-[1000] w-72 md:w-80">
+                <p class="text-xs text-purpura/60 font-bold uppercase">Provincia descubierta</p>
+                <p id="info-prov" class="text-2xl font-title font-bold text-slate-800 leading-tight"></p>
+                <p id="info-com" class="text-sm font-bold text-purpura leading-tight mb-2"></p>
 
                 <!-- Truco de memoria -->
-                <div class="bg-yellow-100 border border-yellow-300 p-3 rounded-lg shadow-inner mt-2">
-                    <p class="text-xs text-yellow-700 font-bold uppercase mb-1">💡 Truco para recordar:</p>
+                <div class="bg-amarillo/15 border border-amarillo/40 p-3 rounded-lg shadow-inner mt-2">
+                    <p class="text-xs text-amber-700 font-bold uppercase mb-1">💡 Truco para recordar:</p>
                     <p id="info-pista" class="font-diario text-xl text-slate-700 leading-tight"></p>
                 </div>
             </div>
@@ -126,9 +150,9 @@
     <script>
         // --- BASE DE DATOS PROVINCIAS -> COMUNIDAD AUTÓNOMA ---
         const mapProvinciaComunidad = {
-            "alava": "País Vasco", "álava": "País Vasco", "araba/álava": "País Vasco",
+            "alava": "País Vasco", "álava": "País Vasco", "araba/álava": "País Vasco", "araba/alava": "País Vasco",
             "albacete": "Castilla-La Mancha",
-            "alicante": "Comunitat Valenciana", "alacant": "Comunitat Valenciana",
+            "alicante": "Comunitat Valenciana", "alacant": "Comunitat Valenciana", "alacant/alicante": "Comunitat Valenciana",
             "almeria": "Andalucía", "almería": "Andalucía",
             "asturias": "Asturias",
             "avila": "Castilla y León", "ávila": "Castilla y León",
@@ -139,14 +163,14 @@
             "caceres": "Extremadura", "cáceres": "Extremadura",
             "cadiz": "Andalucía", "cádiz": "Andalucía",
             "cantabria": "Cantabria",
-            "castellon": "Comunitat Valenciana", "castellón": "Comunitat Valenciana",
+            "castellon": "Comunitat Valenciana", "castellón": "Comunitat Valenciana", "castello/castellon": "Comunitat Valenciana",
             "ciudad real": "Castilla-La Mancha",
             "cordoba": "Andalucía", "córdoba": "Andalucía",
             "cuenca": "Castilla-La Mancha",
             "girona": "Cataluña", "gerona": "Cataluña",
             "granada": "Andalucía",
             "guadalajara": "Castilla-La Mancha",
-            "gipuzkoa": "País Vasco", "guipúzcoa": "País Vasco",
+            "gipuzkoa": "País Vasco", "guipúzcoa": "País Vasco", "gipuzkoa/guipuzcoa": "País Vasco",
             "huelva": "Andalucía",
             "huesca": "Aragón",
             "jaen": "Andalucía", "jaén": "Andalucía",
@@ -171,9 +195,9 @@
             "tarragona": "Cataluña",
             "teruel": "Aragón",
             "toledo": "Castilla-La Mancha",
-            "valencia": "Comunitat Valenciana", "valència": "Comunitat Valenciana",
+            "valencia": "Comunitat Valenciana", "valència": "Comunitat Valenciana", "valencia/valencia": "Comunitat Valenciana",
             "valladolid": "Castilla y León",
-            "bizkaia": "País Vasco", "vizcaya": "País Vasco",
+            "bizkaia": "País Vasco", "vizcaya": "País Vasco", "bizkaia/vizcaya": "País Vasco",
             "zamora": "Castilla y León",
             "zaragoza": "Aragón",
             "ceuta": "Ceuta",
@@ -186,8 +210,10 @@
         const pistasProvincias = {
             "a coruña": "En la esquina de arriba a la izquierda. ¡Parece la punta de un cuerno de rinoceronte!",
             "alava": "Es la única del País Vasco que está abajo y no toca el mar.",
+            "araba/alava": "Es la única del País Vasco que está abajo y no toca el mar.",
             "albacete": "Al este de Castilla-La Mancha. ¡Es muy redondita!",
             "alicante": "La puntita de abajo de la Comunidad Valenciana. Parece un triángulo acostado.",
+            "alacant/alicante": "La puntita de abajo de la Comunidad Valenciana. Parece un triángulo acostado.",
             "almeria": "En la esquina de abajo a la derecha de Andalucía. ¡Aquí hay desiertos de película!",
             "asturias": "En la costa del norte. Es un bloque alargado entre Galicia y Cantabria.",
             "avila": "A la izquierda de Madrid. Es pequeñita y redonda, ¡como una ciudad amurallada!",
@@ -198,6 +224,7 @@
             "cadiz": "La puntita más al sur de España. ¡Si la miras bien, tiene forma de botita o zapato de tacón!",
             "cantabria": "Pequeñita en el norte. Tiene forma de cuña o una pieza de Tetris entre Asturias y País Vasco.",
             "castellon": "Es la provincia de más arriba en la Comunidad Valenciana.",
+            "castello/castellon": "Es la provincia de más arriba en la Comunidad Valenciana.",
             "ciudad real": "Al sur de Toledo, es gigantesca. ¡Aquí peleó Don Quijote contra los molinos de viento!",
             "cordoba": "En el norte de Andalucía. Tiene forma de escudo o cabeza grande.",
             "cuenca": "A la derecha de Madrid. ¡Tiene forma de un dedo pulgar gigante apuntando hacia arriba!",
@@ -205,6 +232,7 @@
             "granada": "En la costa de Andalucía. Aquí están las montañas con nieve (Sierra Nevada).",
             "guadalajara": "Arriba a la derecha de Madrid. Parece que abraza a Madrid por ese lado.",
             "gipuzkoa": "La más chiquitita de todas en la costa norte, tocando la frontera con Francia.",
+            "gipuzkoa/guipuzcoa": "La más chiquitita de todas en la costa norte, tocando la frontera con Francia.",
             "guipuzcoa": "La más chiquitita de todas en la costa norte, tocando la frontera con Francia.",
             "huelva": "En la esquina de abajo a la izquierda de España. ¡De aquí salieron los barcos a América!",
             "huesca": "Arriba del todo en Aragón, tocando las montañas altas de los Pirineos.",
@@ -228,8 +256,10 @@
             "teruel": "Abajo en Aragón. Tiene forma de triángulo invertido y está ¡llena de huesos de dinosaurio!",
             "toledo": "Justo debajo de Madrid. ¡Es enorme y parece un pájaro con las alas abiertas!",
             "valencia": "En el centro de la costa este, frente al mar. ¡Es la cuna de la paella!",
+            "valencia/valencia": "En el centro de la costa este, frente al mar. ¡Es la cuna de la paella!",
             "valladolid": "En el centro de Castilla y León. ¡Está rodeada por un montón de provincias amigas!",
             "bizkaia": "En la costa del País Vasco, con una pequeña forma de 'C'.",
+            "bizkaia/vizcaya": "En la costa del País Vasco, con una pequeña forma de 'C'.",
             "vizcaya": "En la costa del País Vasco, con una pequeña forma de 'C'.",
             "zamora": "En el oeste, tocando Portugal. Tiene un lado muy recto que es la frontera.",
             "zaragoza": "En el centro de Aragón, ¡el río Ebro la corta como si fuera una rebanada de pastel!",
@@ -261,10 +291,41 @@
 
         // --- ESTADO DEL JUEGO ---
         let map, geojsonLayer;
-        let provinciasFeatures = [];
+        let provincesFeatures = [];
         let currentMode = 'explore';
-        let score = 0;
         let currentTargetFeature = null;
+
+        // Estado del examen
+        let examQueue = [];
+        let examTotal = 0;
+        let examCorrect = 0;
+        let examCurrent = 0;
+        let waitingForNext = false;
+
+        function shuffleArray(arr) {
+            const shuffled = [...arr];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
+
+        function iniciarExamen() {
+            examQueue = shuffleArray(provincesFeatures);
+            examTotal = examQueue.length;
+            examCorrect = 0;
+            examCurrent = 0;
+            waitingForNext = false;
+            actualizarProgreso();
+            document.getElementById('exam-progress').classList.remove('hidden');
+        }
+
+        function actualizarProgreso() {
+            document.getElementById('exam-current').innerText = examCurrent;
+            document.getElementById('exam-total').innerText = examTotal;
+            document.getElementById('exam-correct').innerText = examCorrect;
+        }
 
         // --- INICIALIZACIÓN DEL MAPA ---
         function initMap() {
@@ -309,13 +370,13 @@
 
         // --- ESTILOS DEL MAPA ---
         function defaultStyle() {
-            return { fillColor: '#ffffff', weight: 2, color: '#94a3b8', fillOpacity: 0.7 };
+            return { fillColor: '#ffffff', weight: 2, color: '#c4b5fd', fillOpacity: 0.7 };
         }
         function highlightStyle(isTarget = false) {
-            return { fillColor: isTarget ? '#a855f7' : '#2dd4bf', weight: 3, color: '#334155', fillOpacity: 0.9 };
+            return { fillColor: isTarget ? '#7537C8' : '#1CC4AB', weight: 3, color: '#334155', fillOpacity: 0.85 };
         }
-        function successStyle() { return { fillColor: '#4ade80', weight: 3, color: '#166534', fillOpacity: 0.9 }; }
-        function errorStyle() { return { fillColor: '#f87171', weight: 3, color: '#991b1b', fillOpacity: 0.9 }; }
+        function successStyle() { return { fillColor: '#1CC4AB', weight: 3, color: '#065f46', fillOpacity: 0.9 }; }
+        function errorStyle() { return { fillColor: '#F8464A', weight: 3, color: '#7f1d1d', fillOpacity: 0.9 }; }
 
         // --- INTERACCIONES DEL MAPA ---
         function onEachFeature(feature, layer) {
@@ -336,19 +397,19 @@
                 layer.setStyle(highlightStyle());
                 layer.bringToFront();
 
-                // Mostrar tooltip de exploración con pista
                 const infoDiv = document.getElementById('explore-info');
                 document.getElementById('info-prov').innerText = provName;
                 document.getElementById('info-com').innerText = comName;
                 document.getElementById('info-pista').innerText = pista;
                 infoDiv.classList.remove('hidden');
-            } else if (currentMode === 'guess_prov') {
+            } else if (currentMode === 'guess_prov' && !waitingForNext) {
                 layer.setStyle({ fillOpacity: 0.9 });
             }
         }
 
         function handleMouseOut(e) {
             const layer = e.target;
+            if (waitingForNext) return;
             if (!(currentMode === 'guess_com' && currentTargetFeature && layer.feature === currentTargetFeature)) {
                 geojsonLayer.resetStyle(layer);
             }
@@ -360,22 +421,38 @@
                 lanzarConfeti(e.originalEvent.clientX, e.originalEvent.clientY, 20);
 
             } else if (currentMode === 'guess_prov') {
-                if (!currentTargetFeature) return;
+                if (!currentTargetFeature || waitingForNext) return;
 
                 if (feature.properties.name === currentTargetFeature.properties.name) {
+                    waitingForNext = true;
                     layer.setStyle(successStyle());
-                    sumarPunto();
+                    examCorrect++;
+                    actualizarProgreso();
                     mostrarFeedback("¡Súper bien, Sofía! Es " + feature.properties.name + " 🎒", "success");
                     lanzarConfeti(e.originalEvent.clientX, e.originalEvent.clientY);
 
                     setTimeout(() => {
-                        geojsonLayer.resetStyle(layer);
+                        geojsonLayer.eachLayer(l => geojsonLayer.resetStyle(l));
                         siguientePreguntaProvincia();
                     }, 1500);
                 } else {
+                    waitingForNext = true;
                     layer.setStyle(errorStyle());
-                    mostrarFeedback("¡Uy, casi! Esa es " + feature.properties.name + ", ¡sigue buscando!", "error");
-                    setTimeout(() => geojsonLayer.resetStyle(layer), 1500);
+
+                    // Mostrar la provincia correcta en verde
+                    geojsonLayer.eachLayer(l => {
+                        if (l.feature === currentTargetFeature) {
+                            l.setStyle(successStyle());
+                            l.bringToFront();
+                        }
+                    });
+
+                    mostrarFeedback("¡Uy! Era " + currentTargetFeature.properties.name + ". Mira la verde en el mapa.", "error");
+
+                    setTimeout(() => {
+                        geojsonLayer.eachLayer(l => geojsonLayer.resetStyle(l));
+                        siguientePreguntaProvincia();
+                    }, 2500);
                 }
             }
         }
@@ -384,9 +461,10 @@
         function setMode(mode) {
             currentMode = mode;
             currentTargetFeature = null;
+            waitingForNext = false;
 
             document.querySelectorAll('.mode-btn').forEach(btn => {
-                btn.classList.remove('border-teal-500', 'border-blue-500', 'border-purple-500', 'ring-4');
+                btn.classList.remove('bdr-turquesa', 'bdr-azul', 'bdr-purpura', 'ring-4', 'ring-turquesa', 'ring-azul', 'ring-purpura');
                 btn.classList.add('border-transparent', 'opacity-70');
             });
 
@@ -405,16 +483,19 @@
             const prompt = document.getElementById('game-prompt');
 
             if (mode === 'explore') {
-                activeBtn.classList.add('border-teal-500', 'ring-4', 'ring-teal-200');
+                activeBtn.classList.add('bdr-turquesa', 'ring-4', 'ring-turquesa');
+                document.getElementById('exam-progress').classList.add('hidden');
                 title.innerText = "¡Hola exploradora!";
                 prompt.innerHTML = "Toca las provincias para <br><span class='text-lg font-normal text-gray-500'>leer los trucos de memoria de tu diario.</span>";
             }
             else if (mode === 'guess_prov') {
-                activeBtn.classList.add('border-blue-500', 'ring-4', 'ring-blue-200');
+                activeBtn.classList.add('bdr-azul', 'ring-4', 'ring-azul');
+                iniciarExamen();
                 siguientePreguntaProvincia();
             }
             else if (mode === 'guess_com') {
-                activeBtn.classList.add('border-purple-500', 'ring-4', 'ring-purple-200');
+                activeBtn.classList.add('bdr-purpura', 'ring-4', 'ring-purpura');
+                iniciarExamen();
                 siguientePreguntaComunidad();
             }
         }
@@ -422,11 +503,19 @@
         function siguientePreguntaProvincia() {
             document.getElementById('feedback').classList.add('hidden');
             document.getElementById('pista-activa').classList.add('hidden');
-            document.getElementById('btn-pista').classList.remove('hidden'); // Mostrar botón de pista
+            waitingForNext = false;
 
-            currentTargetFeature = provincesFeatures[Math.floor(Math.random() * provincesFeatures.length)];
+            if (examQueue.length === 0) {
+                mostrarResultadosFinales();
+                return;
+            }
 
-            document.getElementById('game-prompt-title').innerText = "Apunta tu brújula hacia:";
+            currentTargetFeature = examQueue.pop();
+            examCurrent++;
+            actualizarProgreso();
+
+            document.getElementById('btn-pista').classList.remove('hidden');
+            document.getElementById('game-prompt-title').innerText = `Pregunta ${examCurrent} de ${examTotal} — Apunta tu brújula hacia:`;
             document.getElementById('game-prompt').innerText = currentTargetFeature.properties.name;
         }
 
@@ -443,8 +532,17 @@
 
         function siguientePreguntaComunidad() {
             document.getElementById('feedback').classList.add('hidden');
+            waitingForNext = false;
 
-            currentTargetFeature = provincesFeatures[Math.floor(Math.random() * provincesFeatures.length)];
+            if (examQueue.length === 0) {
+                mostrarResultadosFinales();
+                return;
+            }
+
+            currentTargetFeature = examQueue.pop();
+            examCurrent++;
+            actualizarProgreso();
+
             const provName = currentTargetFeature.properties.name;
             const correctComunidad = obtenerComunidad(provName);
 
@@ -457,7 +555,7 @@
                 }
             });
 
-            document.getElementById('game-prompt-title').innerText = "Sofía, ¿A qué Comunidad pertenece...";
+            document.getElementById('game-prompt-title').innerText = `Pregunta ${examCurrent} de ${examTotal} — ¿A qué Comunidad pertenece...`;
             document.getElementById('game-prompt').innerText = provName + "?";
 
             let opciones = [correctComunidad];
@@ -477,7 +575,7 @@
 
             opciones.forEach(opcion => {
                 const btn = document.createElement('button');
-                btn.className = "w-full py-3 px-4 bg-white border-2 border-slate-200 hover:border-purple-500 hover:bg-purple-50 rounded-xl font-bold text-slate-700 transition-all text-left shadow-sm";
+                btn.className = "w-full py-3 px-4 bg-white border-2 border-slate-200 hover:border-purpura hover:bg-purpura/5 rounded-xl font-bold text-slate-700 transition-all text-left shadow-sm";
                 btn.innerText = opcion;
                 btn.onclick = () => verificarComunidad(opcion, correctComunidad, btn);
                 btnContainer.appendChild(btn);
@@ -485,22 +583,26 @@
         }
 
         function verificarComunidad(seleccion, correcta, btnElement) {
+            if (waitingForNext) return;
+            waitingForNext = true;
+
             const botones = document.querySelectorAll('#multiple-choice button');
             botones.forEach(b => b.disabled = true);
 
             if (seleccion === correcta) {
                 btnElement.classList.replace('border-slate-200', 'border-green-500');
-                btnElement.classList.replace('hover:border-purple-500', 'bg-green-100');
-                btnElement.classList.replace('hover:bg-purple-50', 'text-green-800');
+                btnElement.classList.replace('hover:border-purpura', 'bg-green-100');
+                btnElement.classList.replace('hover:bg-purpura/5', 'text-green-800');
 
-                sumarPunto();
-                mostrarFeedback("¡Excelente, Sofía! Eres una gran exploradora 🎉", "success");
+                examCorrect++;
+                actualizarProgreso();
+                mostrarFeedback("¡Excelente, Sofía! 🎉", "success");
                 lanzarConfetiCentral();
                 setTimeout(siguientePreguntaComunidad, 2000);
             } else {
-                btnElement.classList.replace('border-slate-200', 'border-red-500');
-                btnElement.classList.replace('hover:border-purple-500', 'bg-red-100');
-                btnElement.classList.replace('hover:bg-purple-50', 'text-red-800');
+                btnElement.classList.replace('border-slate-200', 'border-coral');
+                btnElement.classList.replace('hover:border-purpura', 'bg-coral/10');
+                btnElement.classList.replace('hover:bg-purpura/5', 'text-coral');
 
                 botones.forEach(b => {
                     if (b.innerText === correcta) {
@@ -509,29 +611,68 @@
                     }
                 });
 
-                mostrarFeedback("Oh no, Sofía. Pertenece a " + correcta + ". ¡A la próxima seguro aciertas!", "error");
+                mostrarFeedback("Pertenece a " + correcta + ".", "error");
                 setTimeout(siguientePreguntaComunidad, 3000);
             }
         }
 
-        // --- SISTEMA DE PUNTOS Y FEEDBACK ---
-        function sumarPunto() {
-            score += 10;
-            const scoreEl = document.getElementById('score');
-            scoreEl.innerText = score;
-            scoreEl.classList.add('animate-bounce-short');
-            setTimeout(() => scoreEl.classList.remove('animate-bounce-short'), 500);
+        // --- RESULTADOS FINALES ---
+        function mostrarResultadosFinales() {
+            currentTargetFeature = null;
+            waitingForNext = true;
+            const pct = Math.round((examCorrect / examTotal) * 100);
+
+            let emoji, mensaje;
+            if (pct === 100) {
+                emoji = "🏆👑";
+                mensaje = "¡PERFECTA! Eres la reina de la geografía española.";
+            } else if (pct >= 90) {
+                emoji = "🌟🎉";
+                mensaje = "¡Increíble, Sofía! Eres casi una experta.";
+            } else if (pct >= 75) {
+                emoji = "🎒✨";
+                mensaje = "¡Muy bien! Ya conoces España como una gran viajera.";
+            } else if (pct >= 50) {
+                emoji = "📚🗺️";
+                mensaje = "¡Vas bien! Sigue explorando el mapa para mejorar.";
+            } else {
+                emoji = "💪🧭";
+                mensaje = "¡Ánimo, Sofía! Explora el mapa y vuelve a intentarlo.";
+            }
+
+            const colorClass = pct >= 75 ? 'text-turquesa' : pct >= 50 ? 'text-amarillo' : 'text-coral';
+
+            document.getElementById('game-prompt-title').innerText = "Resultado del examen";
+            document.getElementById('game-prompt').innerHTML =
+                `<div class="text-4xl mb-2">${emoji}</div>` +
+                `<div class="text-5xl font-black ${colorClass}">${examCorrect}/${examTotal}</div>` +
+                `<div class="text-lg text-gray-500 mt-1">${pct}% de aciertos</div>` +
+                `<div class="mt-3 text-base font-bold text-slate-600">${mensaje}</div>`;
+
+            document.getElementById('multiple-choice').classList.add('hidden');
+            document.getElementById('btn-pista').classList.add('hidden');
+            document.getElementById('pista-activa').classList.add('hidden');
+            document.getElementById('feedback').classList.add('hidden');
+
+            geojsonLayer.eachLayer(layer => geojsonLayer.resetStyle(layer));
+
+            if (pct >= 75) {
+                lanzarConfetiCentral();
+                setTimeout(lanzarConfetiCentral, 500);
+                setTimeout(lanzarConfetiCentral, 1000);
+            }
         }
 
+        // --- FEEDBACK ---
         function mostrarFeedback(mensaje, tipo) {
             const fb = document.getElementById('feedback');
             fb.innerText = mensaje;
             fb.className = "mt-auto font-bold text-lg p-3 rounded-xl w-full transition-all animate-bounce-short text-center shadow-sm ";
 
             if (tipo === 'success') {
-                fb.classList.add('bg-green-100', 'text-green-800', 'border-2', 'border-green-400');
+                fb.classList.add('bg-turquesa/15', 'text-emerald-800', 'border-2', 'border-turquesa/40');
             } else {
-                fb.classList.add('bg-red-100', 'text-red-800', 'border-2', 'border-red-400');
+                fb.classList.add('bg-coral/10', 'text-red-800', 'border-2', 'border-coral/40');
             }
             fb.classList.remove('hidden');
         }
@@ -540,11 +681,11 @@
         function lanzarConfeti(x, y, particulas = 50) {
             const xPercent = x / window.innerWidth;
             const yPercent = y / window.innerHeight;
-            confetti({ particleCount: particulas, spread: 70, origin: { x: xPercent, y: yPercent }, colors: ['#2dd4bf', '#a855f7', '#fbbf24', '#f87171'] });
+            confetti({ particleCount: particulas, spread: 70, origin: { x: xPercent, y: yPercent }, colors: ['#F8464A', '#7537C8', '#2D40DF', '#1CC4AB', '#F1DC1B'] });
         }
 
         function lanzarConfetiCentral() {
-            confetti({ particleCount: 100, spread: 100, origin: { y: 0.6 }, colors: ['#4ade80', '#3b82f6', '#fbbf24'] });
+            confetti({ particleCount: 100, spread: 100, origin: { y: 0.6 }, colors: ['#F8464A', '#7537C8', '#2D40DF', '#1CC4AB', '#F1DC1B'] });
         }
 
         window.onload = initMap;
